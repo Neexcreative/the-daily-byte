@@ -129,15 +129,23 @@ function RoteiroPanel({
               {roteiro.seconds > 60 && " · passou de 60s"}
             </p>
             <p className="rhook">“{roteiro.gancho}”</p>
-            <ol className="rlist">
-              {roteiro.blocos.map((b) => (
-                <li key={b.storyId}>
-                  <b>{b.assunto}</b>
-                  <p>{b.texto}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="rclose">{roteiro.fechamento}</p>
+            {/* No celular o texto completo fica recolhido para as notícias aparecerem logo. */}
+            <input type="checkbox" id="rt-toggle" className="rt-toggle" />
+            <label htmlFor="rt-toggle" className="rt-more">
+              <span className="open">Ver roteiro completo</span>
+              <span className="close">Recolher roteiro</span>
+            </label>
+            <div className="rfull">
+              <ol className="rlist">
+                {roteiro.blocos.map((b) => (
+                  <li key={b.storyId}>
+                    <b>{b.assunto}</b>
+                    <p>{b.texto}</p>
+                  </li>
+                ))}
+              </ol>
+              <p className="rclose">{roteiro.fechamento}</p>
+            </div>
             {capa && (
               <div className="rcover">
                 <a href={capa} target="_blank" rel="noopener noreferrer" title="Abrir a capa em tamanho real">
