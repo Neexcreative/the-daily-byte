@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import { longDate } from "@/lib/format";
 import { getDigest, listDates, storageMode } from "@/lib/store";
-import { CATEGORY_LABEL, type Category, type Story } from "@/lib/types";
+import { CATEGORY_LABEL, type Category, type Roteiro } from "@/lib/types";
+import CopyButton from "./CopyButton";
 import Masthead from "./Masthead";
 
 export const dynamic = "force-dynamic";
@@ -23,40 +24,48 @@ function href(d: string | undefined, c: string | undefined): string {
   return s ? `/?${s}` : "/";
 }
 
-function StoryBody({ s, date }: { s: Story; date: string | undefined }) {
-  const title = s.script?.titlePt ?? s.title;
-  const url = `/story/${s.id}${date ? `?d=${date}` : ""}`;
+function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: string | undefined }) {
   return (
-    <>
-      <div className="kicker">
-        <span className={`tag ${s.category}`}>{CATEGORY_LABEL[s.category]}</span>
-        <span>{s.whyRanked}</span>
+    <aside className="rcol" aria-label="Roteiro do dia">
+      <div className="rbox">
+        <div className="rhead">
+          <span>Roteiro do dia</span>
+          {roteiro && <span>~{roteiro.seconds}s</span>}
+        </div>
+
+        {roteiro ? (
+          <>
+            <h3 className="rtitle">{roteiro.titulo}</h3>
+            <p className="rmeta">
+              {roteiro.blocos.length} assuntos · {roteiro.words} palavras
+              {roteiro.seconds > 60 && " · passou de 60s"}
+            </p>
+            <p className="rhook">{roteiro.gancho}</p>
+            <ol className="rlist">
+              {roteiro.blocos.map((b) => (
+                <li key={b.storyId}>
+                  <b>{b.assunto}</b>
+                  <p>{b.texto}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="rclose">{roteiro.fechamento}</p>
+            <div className="ractions">
+              <CopyButton text={roteiro.narracao} label="Copiar roteiro" />
+              {date && (
+                <a className="btn ghost" href={`/roteiro?d=${date}`}>
+                  Modo gravação
+                </a>
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="rempty">
+            O roteiro de hoje ainda não foi gerado. Clica em &quot;Gerar agora&quot; ou espera a entrega das 21h.
+          </p>
+        )}
       </div>
-      <h2 className="headline">
-        <a href={url}>{title}</a>
-      </h2>
-      {s.script?.summary && <p className="summary">{s.script.summary}</p>}
-      {s.script && (
-        <p className="hook">
-          <b>Gancho</b>
-          {s.script.hook}
-        </p>
-      )}
-      <div className="src">
-        {s.sources.map((x) => (
-          <a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">
-            {x.name}
-          </a>
-        ))}
-      </div>
-      {s.script ? (
-        <a className="open" href={url}>
-          Abrir roteiro (~{s.script.seconds}s) →
-        </a>
-      ) : (
-        <p className="noscript">Sem roteiro para esta notícia.</p>
-      )}
-    </>
+    </aside>
   );
 }
 
@@ -75,14 +84,14 @@ export default async function Home({
   const cat = SECTIONS.find((x) => x === c);
   const all = digest?.stories ?? [];
   const shown = cat ? all.filter((s) => s.category === cat) : all;
-  const [lead, ...rest] = shown;
   const count = (k: Category) => all.filter((s) => s.category === k).length;
+  const inRoteiro = new Set(digest?.roteiro?.blocos.map((b) => b.storyId) ?? []);
 
   return (
     <>
       <Masthead
         left={current ? longDate(current) : "Sem edição"}
-        right={`Edição das 21h · ${all.length} histórias`}
+        right={`Edição das 21h · ${all.length} notícias`}
       />
 
       <div className="shell">
@@ -124,11 +133,11 @@ export default async function Home({
           )}
         </aside>
 
-        <main>
+        <main className="feed">
           <div className="section-title">
-            <h2>{cat ? CATEGORY_LABEL[cat] : "Destaques do dia"}</h2>
+            <h2>{cat ? CATEGORY_LABEL[cat] : "Notícias do dia"}</h2>
             <span>
-              {shown.length} {shown.length === 1 ? "história" : "histórias"}
+              {shown.length} {shown.length === 1 ? "notícia" : "notícias"}
             </span>
           </div>
 
@@ -143,21 +152,29 @@ export default async function Home({
 
           {digest && shown.length === 0 && (
             <div className="empty">
-              <p>Nenhuma história nesta seção hoje.</p>
+              <p>Nenhuma notícia nesta seção hoje.</p>
             </div>
           )}
 
-          {lead && (
-            <article className="lead">
-              <StoryBody s={lead} date={current} />
-            </article>
-          )}
-
-          {rest.map((s, i) => (
-            <article className="row" key={s.id}>
-              <div className="num">{i + 2}</div>
-              <div>
-                <StoryBody s={s} date={current} />
+          {shown.map((s) => (
+            <article className={`card${inRoteiro.has(s.id) ? " inroteiro" : ""}`} key={s.id}>
+              <div className="kicker">
+                <span className={`tag ${s.category}`}>{CATEGORY_LABEL[s.category]}</span>
+                <span>{s.whyRanked}</span>
+                {s.controversy != null && (
+                  <span className={`heat${s.controversy >= 7 ? " hot" : ""}`}>Polêmica {s.controversy}/10</span>
+                )}
+                {inRoteiro.has(s.id) && <span className="flag">No roteiro</span>}
+              </div>
+              <h2 className="headline">{s.titlePt ?? s.title}</h2>
+              {s.summary && <p className="summary">{s.summary}</p>}
+              {s.titlePt && s.titlePt !== s.title && <p className="orig">Original: {s.title}</p>}
+              <div className="src">
+                {s.sources.map((x) => (
+                  <a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">
+                    {x.name}
+                  </a>
+                ))}
               </div>
             </article>
           ))}
@@ -172,12 +189,13 @@ export default async function Home({
               {digest.diagnostics.emailStatus} · armazenamento: {storageMode}
               {digest.diagnostics.feedsFailed.length > 0 &&
                 ` · feeds com falha: ${digest.diagnostics.feedsFailed.join(", ")}`}
-              {digest.diagnostics.scriptErrors > 0 &&
-                ` · roteiros com erro: ${digest.diagnostics.scriptErrors}`}
+              {digest.diagnostics.aiError && ` · erro da IA: ${digest.diagnostics.aiError}`}
               . Confere a fonte original antes de publicar.
             </p>
           )}
         </main>
+
+        <RoteiroPanel roteiro={digest?.roteiro} date={current} />
       </div>
     </>
   );

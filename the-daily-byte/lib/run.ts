@@ -1,6 +1,6 @@
 import { collect } from "./collect";
 import { rank } from "./rank";
-import { writeScripts } from "./script";
+import { enrich, writeRoteiro } from "./script";
 import { getDigest, listDates, saveDigest } from "./store";
 import { sendEmail } from "./email";
 import type { Digest } from "./types";
@@ -15,9 +15,9 @@ export function dateKey(tz = process.env.DIGEST_TZ || "Europe/Dublin", at = new 
 }
 
 export function localHour(tz = process.env.DIGEST_TZ || "Europe/Dublin", at = new Date()): number {
-  return Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }).format(at),
-  ) % 24;
+  return (
+    Number(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }).format(at)) % 24
+  );
 }
 
 export async function runDigest(opts: { sendMail?: boolean } = {}): Promise<Digest> {
@@ -35,19 +35,27 @@ export async function runDigest(opts: { sendMail?: boolean } = {}): Promise<Dige
   }
 
   const { items, feedsOk, feedsFailed } = await collect(now);
-  const ranked = rank(items, now, exclude, 8);
-  const { stories, errors } = await writeScripts(ranked, items, 8);
+
+  // 12 candidatas; a IA junta as que são o mesmo fato e sobram até 10.
+  const ranked = rank(items, now, exclude, 12);
+  const enriched = await enrich(ranked, items);
+  const stories = enriched.stories.slice(0, 10);
+
+  const written = stories.length ? await writeRoteiro(stories) : { error: "nenhuma notícia coletada" };
+  const aiErrors = [enriched.error, written.error].filter(Boolean) as string[];
 
   const digest: Digest = {
     date,
     generatedAt: new Date(now).toISOString(),
     stories,
+    roteiro: written.roteiro,
     diagnostics: {
       feedsOk,
       feedsFailed,
       itemsCollected: items.length,
-      scriptErrors: errors,
+      scriptErrors: aiErrors.length,
       emailStatus: "não enviado",
+      aiError: aiErrors.length ? aiErrors.join(" | ") : undefined,
     },
   };
 
