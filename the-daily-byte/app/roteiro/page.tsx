@@ -29,7 +29,7 @@ export default async function RoteiroPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <Masthead left={date ? `Roteiro · ${longDate(date)}` : "Roteiro"} right="Modo gravação" />
+      <Masthead left={date ? `Modo gravação · ${longDate(date)}` : "Modo gravação"} />
 
       <main className="article">
         <a className="back" href={date ? `/?d=${date}` : "/"}>

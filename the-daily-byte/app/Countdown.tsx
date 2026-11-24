@@ -28,9 +28,9 @@ export default function Countdown({ hour = 21, tz = "Europe/Dublin" }: { hour?: 
   }, [hour, tz]);
 
   return (
-    <div className="clock" aria-live="off">
-      <small>Próxima edição ({String(hour).padStart(2, "0")}:00, Dublin)</small>
+    <span className="clock mono" title={`Próxima edição às ${String(hour).padStart(2, "0")}:00 (Dublin)`}>
+      <small>próx. edição</small>
       <b suppressHydrationWarning>{left ?? "--:--:--"}</b>
-    </div>
+    </span>
   );
 }

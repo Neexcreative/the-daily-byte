@@ -36,6 +36,8 @@ export type Story = {
   summary?: string;
   /** 1 a 10: o quanto o assunto é polêmico ou gera debate. */
   controversy?: number;
+  /** 1 a 2 palavras que resumem o assunto (ex.: NVIDIA, CHIPS, $30 BI). Estampa a imagem gerada quando não há foto. */
+  keyword?: string;
   /** Outros fatos do dia sobre o mesmo assunto (mesma empresa, pessoa ou saga). */
   related?: RelatedRef[];
 };

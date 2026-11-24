@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "The Daily Byte",
     short_name: "Daily Byte",
-    description: "Tech, IA e geopolítica da tecnologia. Informação com fonte.",
+    description: "Sua dose diária de conhecimento sobre tech, IA, geopolítica e entretenimento.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -68,6 +68,7 @@ type Meta = {
   titlePt?: string;
   summary?: string;
   controversy?: number;
+  keyword?: string;
   duplicateOf?: string | null;
   relatedPt?: string[];
 };
@@ -101,6 +102,7 @@ export async function enrich(
 - "titlePt": manchete em português do Brasil, estilo jornal, até 100 caracteres.
 - "summary": resumo em 2 frases em português do Brasil, só com fatos das fontes.
 - "controversy": inteiro de 1 a 10 indicando o quanto o assunto é polêmico, disputado ou gera debate (conflitos, proibições, processos, demissões, escândalos, segurança, ética, tensão EUA e China). Lançamentos neutros ficam entre 1 e 4.
+- "keyword": 1 ou 2 palavras em caixa alta que resumem o assunto para estampar uma imagem: a empresa, o país, o produto ou o número principal (ex.: "NVIDIA", "CHIPS", "$30 BI", "CHINA"). Máximo 14 caracteres.
 - "relatedPt": se a notícia tem "outros fatos do mesmo assunto", traduza cada título para português, na mesma ordem, em um array de textos. Sem eles, devolva [].
 - "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Considere duplicadas notícias do mesmo fato mesmo com títulos em idiomas diferentes (inglês e português) ou ângulos diferentes do mesmo anúncio. Aponte sempre para a notícia mais completa. Notícias sobre a mesma pessoa ou empresa mas fatos diferentes NÃO são duplicadas.
 
@@ -124,6 +126,7 @@ Responda APENAS com um array JSON, sem markdown.`;
           titlePt: typeof m?.relatedPt?.[i] === "string" ? m.relatedPt[i] : undefined,
         })),
         titlePt: m?.titlePt ? String(m.titlePt) : undefined,
+        keyword: m?.keyword ? String(m.keyword).toUpperCase().slice(0, 16) : undefined,
         summary: m?.summary ? String(m.summary) : undefined,
         controversy: Number.isFinite(c) ? Math.min(10, Math.max(1, Math.round(c))) : undefined,
       });

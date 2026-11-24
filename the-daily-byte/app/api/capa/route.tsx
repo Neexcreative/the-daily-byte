@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { isAuthed } from "@/lib/auth";
 import { getDigest, listDates } from "@/lib/store";
 import type { Digest, Story } from "@/lib/types";
+import { INSTAGRAM } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -188,19 +189,34 @@ export async function GET(req: Request) {
           ) : (
             <div style={{ display: "flex", fontFamily: display, fontSize: 72 }}>THE DAILY BYTE</div>
           )}
-          <div
-            style={{
-              display: "flex",
-              fontFamily: mono,
-              fontSize: 34,
-              padding: "12px 22px",
-              border: "3px solid #fff",
-              borderRadius: 10,
-              background: "rgba(10,10,10,.35)",
-              textTransform: "uppercase",
-            }}
-          >
-            {shortDate(date)}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                fontFamily: mono,
+                fontSize: 34,
+                padding: "12px 22px",
+                border: "3px solid #fff",
+                borderRadius: 10,
+                background: "rgba(10,10,10,.35)",
+                textTransform: "uppercase",
+              }}
+            >
+              {shortDate(date)}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                fontFamily: mono,
+                fontSize: 32,
+                padding: "10px 20px",
+                borderRadius: 10,
+                background: INK,
+                color: "#fff",
+              }}
+            >
+              @{INSTAGRAM}
+            </div>
           </div>
         </div>
 

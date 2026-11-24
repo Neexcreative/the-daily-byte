@@ -10,7 +10,7 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variabl
 
 export const metadata: Metadata = {
   title: "The Daily Byte",
-  description: "Notícias de tech, IA e geopolítica, com fontes e roteiro pronto.",
+  description: "Sua dose diária de conhecimento sobre tech, IA, geopolítica e entretenimento.",
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
