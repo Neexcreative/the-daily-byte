@@ -1,0 +1,10 @@
+THE DAILY BYTE · CORES
+
+Vermelho  #D92D14  rgb(217, 45, 20)   cor principal, fundos de destaque
+Tinta     #0A0A0A  rgb(10, 10, 10)    texto, painéis escuros
+Branco    #FFFFFF  rgb(255, 255, 255) painéis e texto sobre vermelho
+Papel     #F4F2EE  rgb(244, 242, 238) fundo do site
+Grafite   #5C5C5C  rgb(92, 92, 92)    texto secundário
+Cinza     #A8A8A8  rgb(168, 168, 168) texto secundário em fundo escuro
+
+Instagram: @thedailybyte_26

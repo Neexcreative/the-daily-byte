@@ -1,0 +1,10 @@
+Fontes do The Daily Byte (Google Fonts, licença SIL Open Font License 1.1: uso livre, inclusive comercial)
+
+Títulos ....... Big Shoulders 700 / 800 / 900
+Texto ......... IBM Plex Sans 400 / 500 / 600 / 700
+Rótulos/horas . IBM Plex Mono 400 / 500 / 600
+
+Licença: https://openfontlicense.org
+Páginas: https://fonts.google.com/specimen/Big+Shoulders
+         https://fonts.google.com/specimen/IBM+Plex+Sans
+         https://fonts.google.com/specimen/IBM+Plex+Mono

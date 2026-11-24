@@ -370,6 +370,9 @@ export default async function Home({
           <a className="mono" href={BRAND_URL} target="_blank" rel="noopener noreferrer">
             Design system
           </a>
+          <a className="mono" href="/marca">
+            Kit da marca
+          </a>
         </div>
       </footer>
     </>
