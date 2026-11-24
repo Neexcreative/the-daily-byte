@@ -28,7 +28,7 @@ function parseJson(text: string): unknown {
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-async function gemini(system: string, user: string): Promise<unknown> {
+async function geminiOnly(system: string, user: string): Promise<unknown> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("sem GEMINI_API_KEY na Vercel");
   // Se um modelo estiver sobrecarregado (503) ou sem cota (429), tenta o próximo.
@@ -83,6 +83,61 @@ async function gemini(system: string, user: string): Promise<unknown> {
     }
   }
   throw new Error(`Gemini indisponível após tentar vários modelos (${log.join(", ")})`);
+}
+
+/** Reserva gratuita (Groq) para quando o Gemini estiver fora do ar ou sem cota. */
+async function groq(system: string, user: string): Promise<unknown> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("sem GROQ_API_KEY");
+  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  // Sem response_format json_object: o enrich() espera um array.
+  const body = JSON.stringify({
+    model,
+    temperature: 0.6,
+    max_tokens: 4096,
+    messages: [
+      { role: "system", content: system + "\nResponda em JSON válido." },
+      { role: "user", content: user },
+    ],
+  });
+
+  let status = 0;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body,
+    });
+    status = res.status;
+    if (res.status === 429 || res.status >= 500) {
+      await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Groq ${res.status}`);
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const out = parseJson(data.choices?.[0]?.message?.content ?? "");
+    if (!Array.isArray(out) && system.includes("array JSON") && out && typeof out === "object") {
+      const arr = Object.values(out as Record<string, unknown>).find(Array.isArray);
+      if (arr) return arr;
+    }
+    return out;
+  }
+  throw new Error(`Groq ${status}`);
+}
+
+/** Gemini primeiro; se falhar e houver GROQ_API_KEY, usa o Groq. */
+async function gemini(system: string, user: string): Promise<unknown> {
+  try {
+    return await geminiOnly(system, user);
+  } catch (e) {
+    const gErr = (e as Error).message;
+    if (!process.env.GROQ_API_KEY) throw e;
+    try {
+      return await groq(system, user);
+    } catch (e2) {
+      throw new Error(`${gErr} | reserva: ${(e2 as Error).message}`);
+    }
+  }
 }
 
 type Meta = {
@@ -192,6 +247,7 @@ type RawRoteiro = {
 /** Escreve UM roteiro de até 60 segundos com 4 ou mais assuntos, priorizando os mais polêmicos. */
 export async function writeRoteiro(
   stories: Story[],
+  previous?: Roteiro,
 ): Promise<{ roteiro?: Roteiro; error?: string }> {
   const candidates = [...stories]
     .sort((a, b) => (b.controversy ?? 0) - (a.controversy ?? 0) || b.score - a.score)
@@ -220,7 +276,9 @@ Estrutura:
 Responda APENAS com JSON, sem markdown:
 {"titulo":"título curto do vídeo","gancho":"...","blocos":[{"storyId":"id da lista","assunto":"2 a 4 palavras","texto":"..."}],"fechamento":"..."}`;
 
-  let feedback = "";
+  let feedback = previous
+    ? `\n\nO roteiro anterior começava com "${previous.gancho}". Escreva uma versão NOVA, com outro gancho e outro ângulo, sem repetir as frases anteriores.`
+    : "";
   let best: Roteiro | undefined;
   let lastError: string | undefined;
 
