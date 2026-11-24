@@ -46,7 +46,7 @@ export default function Masthead({
           <a href="/" className="hero-logo" aria-label="The Daily Byte, início">
             {/* Arquivo oficial do logotipo: não redesenhar. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo.png" alt="The Daily Byte" width={220} height={220} />
+            <img src="/brand/logo-horizontal.webp" alt="The Daily Byte" width={1008} height={262} />
           </a>
           <p className="hero-sub">{TAGLINE}</p>
         </div>

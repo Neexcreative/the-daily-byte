@@ -87,8 +87,9 @@ a { color: inherit; }
 .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 0 50%, rgba(255,255,255,.05) 50% 100%); background-size: 100% 4px; mix-blend-mode: overlay; }
 .hero-in { display: grid; justify-items: center; gap: 18px; padding-top: 40px; padding-bottom: 40px; text-align: center; position: relative; z-index: 1; }
 .hero-logo { display: block; line-height: 0; transition: transform .5s var(--ease); }
-.hero-logo:hover { transform: rotate(-2deg) scale(1.02); }
-.hero-logo img { width: 220px; height: 220px; border-radius: var(--radius); box-shadow: 0 24px 60px rgba(0,0,0,.28); }
+.hero-logo:hover { transform: rotate(-1deg) scale(1.01); }
+.hero-logo { width: min(720px, 100%); }
+.hero-logo img { width: 100%; height: auto; filter: drop-shadow(0 14px 28px rgba(0,0,0,.25)); }
 .hero-sub { margin: 0; max-width: 34ch; font-size: clamp(18px, 1.8vw, 22px); font-weight: 600; line-height: 1.35; color: #fff; text-wrap: balance; }
 
 /* Faixa de manchetes */
@@ -296,7 +297,7 @@ body { background-image: linear-gradient(rgba(10,10,10,.045) 1px, transparent 1p
   .util .mast-actions .run { flex: 1; }
   .util .mast-actions .btn.solid { flex: 1; }
   .hero-in { padding-top: 26px; padding-bottom: 26px; gap: 14px; }
-  .hero-logo img { width: 150px; height: 150px; }
+  .hero-logo { width: 100%; }
   .hero-sub { font-size: 16.5px; }
   .ticker span { font-size: 18px; }
   .tile.std .gen-panel { padding: 12px 10px 8px; gap: 5px; max-width: 92%; }
