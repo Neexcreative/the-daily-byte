@@ -2,10 +2,56 @@ import Parser from "rss-parser";
 import { FEEDS, type Feed } from "./feeds";
 import type { Item } from "./types";
 
-const parser = new Parser({
+type Extra = {
+  mediaContent?: { $?: { url?: string; medium?: string; type?: string } }[];
+  mediaThumbnail?: { $?: { url?: string } } | { $?: { url?: string } }[];
+  contentEncoded?: string;
+};
+
+const parser: Parser<object, Extra> = new Parser({
   timeout: 12000,
   headers: { "User-Agent": "TheDailyByte/1.0 (+news digest)" },
+  customFields: {
+    item: [
+      ["media:content", "mediaContent", { keepArray: true }],
+      ["media:thumbnail", "mediaThumbnail"],
+      ["content:encoded", "contentEncoded"],
+    ],
+  },
 });
+
+const IMG_EXT = /\.(jpe?g|png|webp|avif|gif)(\?|$)/i;
+
+function okImage(u: string | undefined): string | undefined {
+  if (!u) return undefined;
+  const url = u.trim().replace(/&amp;/g, "&");
+  if (!/^https:\/\//i.test(url)) return undefined;
+  // Ícones, pixels de rastreio e avatares não servem de foto de capa.
+  if (/(pixel|tracking|feedburner|gravatar|emoji|favicon|logo|avatar|1x1)/i.test(url)) return undefined;
+  return url;
+}
+
+/** Procura a foto da matéria nos campos que os feeds costumam usar. */
+function imageOf(entry: Parser.Item & Extra): string | undefined {
+  const enc = entry.enclosure;
+  if (enc?.url && (enc.type?.startsWith("image") || IMG_EXT.test(enc.url))) {
+    const u = okImage(enc.url);
+    if (u) return u;
+  }
+  for (const m of entry.mediaContent ?? []) {
+    const a = m?.$;
+    if (a?.url && (a.medium === "image" || a.type?.startsWith("image") || IMG_EXT.test(a.url))) {
+      const u = okImage(a.url);
+      if (u) return u;
+    }
+  }
+  const th = entry.mediaThumbnail;
+  const thumb = Array.isArray(th) ? th[0]?.$?.url : th?.$?.url;
+  if (okImage(thumb)) return okImage(thumb);
+  const html = `${entry.contentEncoded ?? ""} ${entry.content ?? ""}`;
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return okImage(m?.[1]);
+}
 
 const MAX_AGE_MS = 36 * 3600 * 1000;
 
@@ -44,6 +90,7 @@ async function readFeed(feed: Feed, now: number): Promise<Item[]> {
       publishedAt: ts,
       snippet: clean(entry.contentSnippet ?? entry.content ?? entry.summary),
       weight: feed.weight,
+      image: imageOf(entry),
     });
   }
   return items;

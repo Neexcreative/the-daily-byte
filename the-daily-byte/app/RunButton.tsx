@@ -9,13 +9,13 @@ export default function RunButton() {
   const [msg, setMsg] = useState("");
 
   return (
-    <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+    <span className="run">
       <button
-        className="btn"
+        className="btn primary"
         disabled={busy}
         onClick={async () => {
           setBusy(true);
-          setMsg("Coletando e escrevendo roteiros. Leva cerca de 1 minuto.");
+          setMsg("Coletando notícias e escrevendo o roteiro. Leva cerca de 1 minuto.");
           try {
             const res = await fetch("/api/run", { method: "POST" });
             if (!res.ok) throw new Error(String(res.status));
@@ -28,9 +28,9 @@ export default function RunButton() {
           }
         }}
       >
-        {busy ? "Gerando..." : "Gerar agora"}
+        {busy ? "Gerando…" : "Gerar edição"}
       </button>
-      {msg && <small style={{ color: "var(--mast-muted)" }}>{msg}</small>}
+      {msg && <small className="run-msg">{msg}</small>}
     </span>
   );
 }

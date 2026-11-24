@@ -1,5 +1,6 @@
 import type { Item, Roteiro, Story } from "./types";
 import { CATEGORY_LABEL } from "./types";
+import { tokens } from "./rank";
 
 const MAX_WORDS = 150; // 60 segundos a ~150 palavras por minuto
 const WPS = 2.5; // palavras por segundo, fala natural
@@ -101,7 +102,7 @@ export async function enrich(
 - "summary": resumo em 2 frases em português do Brasil, só com fatos das fontes.
 - "controversy": inteiro de 1 a 10 indicando o quanto o assunto é polêmico, disputado ou gera debate (conflitos, proibições, processos, demissões, escândalos, segurança, ética, tensão EUA e China). Lançamentos neutros ficam entre 1 e 4.
 - "relatedPt": se a notícia tem "outros fatos do mesmo assunto", traduza cada título para português, na mesma ordem, em um array de textos. Sem eles, devolva [].
-- "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Notícias sobre a mesma pessoa mas fatos diferentes NÃO são duplicadas.
+- "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Considere duplicadas notícias do mesmo fato mesmo com títulos em idiomas diferentes (inglês e português) ou ângulos diferentes do mesmo anúncio. Aponte sempre para a notícia mais completa. Notícias sobre a mesma pessoa ou empresa mas fatos diferentes NÃO são duplicadas.
 
 Responda APENAS com um array JSON, sem markdown.`;
 
@@ -128,19 +129,56 @@ Responda APENAS com um array JSON, sem markdown.`;
       });
     }
 
-    const removed = new Set<string>();
-    for (const s of stories) {
-      const dup = meta.get(s.id)?.duplicateOf;
-      if (!dup || dup === s.id || !copy.has(dup) || meta.get(dup)?.duplicateOf) continue;
-      const target = copy.get(dup)!;
-      for (const x of s.sources) {
-        if (target.sources.length >= 6) break;
-        if (!target.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) {
-          target.sources.push(x);
-        }
+    // Resolve cadeias (A→B→C) para que tudo vá parar na mesma notícia.
+    const rootOf = (id: string): string => {
+      const seen = new Set<string>();
+      let cur = id;
+      while (!seen.has(cur)) {
+        seen.add(cur);
+        const next = meta.get(cur)?.duplicateOf;
+        if (!next || next === cur || !copy.has(next) || seen.has(next)) break;
+        cur = next;
       }
-      target.score = Math.max(target.score, s.score) + 1;
+      return cur;
+    };
+
+    const removed = new Set<string>();
+    const absorb = (target: Story, s: Story) => {
+      const from = copy.get(s.id)!;
+      for (const x of from.sources) {
+        if (target.sources.length >= 8) break;
+        if (!target.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) target.sources.push(x);
+      }
+      for (const r of from.related ?? []) {
+        target.related = target.related ?? [];
+        if (target.related.length < 6 && !target.related.some((y) => y.url === r.url)) target.related.push(r);
+      }
+      target.image = target.image ?? from.image;
+      target.summary = target.summary ?? from.summary;
+      target.controversy = Math.max(target.controversy ?? 0, from.controversy ?? 0) || undefined;
+      target.score = Math.max(target.score, from.score) + 1;
       removed.add(s.id);
+    };
+
+    for (const s of stories) {
+      const root = rootOf(s.id);
+      if (root !== s.id) absorb(copy.get(root)!, s);
+    }
+
+    // Segunda rede: manchetes em português quase iguais também são o mesmo fato.
+    const alive = stories.filter((s) => !removed.has(s.id)).sort((a, b) => b.score - a.score);
+    const tok = new Map(alive.map((s) => [s.id, tokens(copy.get(s.id)!.titlePt ?? s.title)]));
+    for (let i = 0; i < alive.length; i++) {
+      if (removed.has(alive[i].id)) continue;
+      for (let j = i + 1; j < alive.length; j++) {
+        if (removed.has(alive[j].id)) continue;
+        const a = tok.get(alive[i].id)!;
+        const b = tok.get(alive[j].id)!;
+        let inter = 0;
+        for (const t of a) if (b.has(t)) inter++;
+        const sim = a.size && b.size ? inter / (a.size + b.size - inter) : 0;
+        if (sim >= 0.45) absorb(copy.get(alive[i].id)!, alive[j]);
+      }
     }
 
     const out = stories

@@ -1,31 +1,42 @@
 import RunButton from "./RunButton";
 import { logout } from "./login/actions";
 
-export default function Masthead({ left, right }: { left: string; right: string }) {
+export default function Masthead({
+  left,
+  right,
+  children,
+}: {
+  left: string;
+  right: string;
+  /** Barra de seções, logo abaixo do nome do jornal. */
+  children?: React.ReactNode;
+}) {
   return (
     <header className="mast">
-      <div className="mast-in">
-        <div className="mast-top">
-          <div>
-            <h1 className="brand">
-              <a href="/" style={{ textDecoration: "none" }}>
-                The Daily <span>Byte</span>
-              </a>
-            </h1>
-            <p className="tagline">Tech, IA e geopolítica, com fontes e roteiro pronto.</p>
-          </div>
+      <div className="mast-util">
+        <div className="wrap util-in">
+          <span className="util-date">{left}</span>
           <div className="mast-actions">
             <RunButton />
             <form action={logout}>
-              <button className="btn ghost">Sair</button>
+              <button className="btn quiet">Sair</button>
             </form>
           </div>
         </div>
-        <div className="dateline">
-          <span>{left}</span>
-          <span>{right}</span>
-        </div>
       </div>
+      <div className="wrap mast-brand">
+        <h1 className="brand">
+          <a href="/">
+            The Daily <em>Byte</em>
+          </a>
+        </h1>
+        <p className="tagline">Tecnologia, inteligência artificial e geopolítica · {right}</p>
+      </div>
+      {children && (
+        <nav className="mast-nav" aria-label="Seções">
+          <div className="wrap nav-in">{children}</div>
+        </nav>
+      )}
     </header>
   );
 }

@@ -2,19 +2,14 @@ import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import { longDate } from "@/lib/format";
 import { getDigest, listDates, storageMode } from "@/lib/store";
-import { CATEGORY_LABEL, type Category, type Roteiro } from "@/lib/types";
+import { CATEGORY_LABEL, type Category, type Roteiro, type Story } from "@/lib/types";
 import CopyButton from "./CopyButton";
 import Masthead from "./Masthead";
+import Thumb from "./Thumb";
 
 export const dynamic = "force-dynamic";
 
 const SECTIONS: Category[] = ["ai", "tech", "geo", "market"];
-const DOT: Record<Category, string> = {
-  ai: "var(--ai)",
-  tech: "var(--tech)",
-  geo: "var(--geo)",
-  market: "var(--market)",
-};
 
 function href(d: string | undefined, c: string | undefined): string {
   const q = new URLSearchParams();
@@ -24,13 +19,97 @@ function href(d: string | undefined, c: string | undefined): string {
   return s ? `/?${s}` : "/";
 }
 
+function shortDate(d: string): string {
+  return new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/** Tamanho de cada cartão no bento: manchete grande, destaques largos e o resto em blocos. */
+type Size = "hero" | "tall" | "wide" | "std";
+function sizeOf(i: number): Size {
+  if (i === 0) return "hero";
+  if (i === 1) return "tall";
+  if (i === 5) return "wide";
+  return "std";
+}
+
+function StoryCard({ s, size, inRoteiro }: { s: Story; size: Size; inRoteiro: boolean }) {
+  const title = s.titlePt ?? s.title;
+  const lead = s.sources[0]?.url;
+  const related = s.related ?? [];
+  const showRelated = size === "std" ? 0 : size === "hero" ? 4 : 3;
+
+  return (
+    <article className={`tile ${size} ${s.category}`}>
+      <a className="tile-media" href={lead} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
+        <Thumb src={s.image} category={s.category} alt="" />
+        {inRoteiro && <span className="badge">No roteiro</span>}
+      </a>
+
+      <div className="tile-body">
+        <div className="kicker">
+          <span className="tag">{CATEGORY_LABEL[s.category]}</span>
+          <span className="meta">{s.whyRanked}</span>
+          {s.controversy != null && s.controversy >= 6 && (
+            <span className={`heat${s.controversy >= 8 ? " hot" : ""}`}>Polêmica {s.controversy}/10</span>
+          )}
+        </div>
+
+        <h2 className="headline">
+          <a href={lead} target="_blank" rel="noopener noreferrer" title={s.titlePt ? `Original: ${s.title}` : undefined}>
+            {title}
+          </a>
+        </h2>
+
+        {s.summary && <p className="summary">{s.summary}</p>}
+
+        {showRelated > 0 && related.length > 0 && (
+          <div className="related">
+            <h4>Desdobramentos</h4>
+            <ul>
+              {related.slice(0, showRelated).map((r) => (
+                <li key={r.url}>
+                  <a href={r.url} target="_blank" rel="noopener noreferrer">
+                    {r.titlePt ?? r.title}
+                  </a>
+                  <span>{r.source}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="tile-foot">
+          <div className="src">
+            {s.sources.slice(0, size === "std" ? 3 : 6).map((x) => (
+              <a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">
+                {x.name}
+              </a>
+            ))}
+            {size === "std" && s.sources.length > 3 && <span className="more">+{s.sources.length - 3}</span>}
+          </div>
+          {size === "std" && related.length > 0 && (
+            <span className="more">
+              +{related.length} {related.length === 1 ? "desdobramento" : "desdobramentos"}
+            </span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: string | undefined }) {
   return (
     <aside className="rcol" aria-label="Roteiro do dia">
       <div className="rbox">
         <div className="rhead">
           <span>Roteiro do dia</span>
-          {roteiro && <span>~{roteiro.seconds}s</span>}
+          {roteiro && <span className="pill">~{roteiro.seconds}s</span>}
         </div>
 
         {roteiro ? (
@@ -40,7 +119,7 @@ function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: s
               {roteiro.blocos.length} assuntos · {roteiro.words} palavras
               {roteiro.seconds > 60 && " · passou de 60s"}
             </p>
-            <p className="rhook">{roteiro.gancho}</p>
+            <p className="rhook">“{roteiro.gancho}”</p>
             <ol className="rlist">
               {roteiro.blocos.map((b) => (
                 <li key={b.storyId}>
@@ -53,15 +132,15 @@ function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: s
             <div className="ractions">
               <CopyButton text={roteiro.narracao} label="Copiar roteiro" />
               {date && (
-                <a className="btn ghost" href={`/roteiro?d=${date}`}>
-                  Modo gravação
+                <a className="btn soft" href={`/roteiro?d=${date}`}>
+                  Modo gravação →
                 </a>
               )}
             </div>
           </>
         ) : (
           <p className="rempty">
-            O roteiro de hoje ainda não foi gerado. Clica em &quot;Gerar agora&quot; ou espera a entrega das 21h.
+            O roteiro desta edição ainda não foi escrito. Toca em &quot;Gerar edição&quot; ou espera a entrega das 21h.
           </p>
         )}
       </div>
@@ -89,53 +168,42 @@ export default async function Home({
 
   return (
     <>
-      <Masthead
-        left={current ? longDate(current) : "Sem edição"}
-        right={`Edição das 21h · ${all.length} notícias`}
-      />
-
-      <div className="shell">
-        <aside className="side">
-          <h3>Seções</h3>
-          <ul>
-            <li>
-              <a href={href(current, undefined)} aria-current={!cat}>
-                <span>Todas</span>
-                <span className="n">{all.length}</span>
+      <Masthead left={current ? longDate(current) : "Sem edição"} right={`edição das 21h · ${all.length} notícias`}>
+        <ul className="sections">
+          <li>
+            <a href={href(current, undefined)} aria-current={!cat}>
+              Destaques <span className="n">{all.length}</span>
+            </a>
+          </li>
+          {SECTIONS.map((k) => (
+            <li key={k}>
+              <a href={href(current, k)} aria-current={cat === k} className={k}>
+                {CATEGORY_LABEL[k]} <span className="n">{count(k)}</span>
               </a>
             </li>
-            {SECTIONS.map((k) => (
-              <li key={k}>
-                <a href={href(current, k)} aria-current={cat === k}>
-                  <span>
-                    <i className="dot" style={{ background: DOT[k] }} />
-                    {CATEGORY_LABEL[k]}
-                  </span>
-                  <span className="n">{count(k)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+          ))}
+        </ul>
 
-          {dates.length > 0 && (
-            <>
-              <h3>Edições</h3>
-              <ul className="dates">
-                {dates.map((x) => (
-                  <li key={x}>
-                    <a href={href(x, cat)} aria-current={x === current}>
-                      <span>{x}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </aside>
+        {dates.length > 0 && (
+          <details className="editions">
+            <summary>Edições anteriores</summary>
+            <ul>
+              {dates.map((x) => (
+                <li key={x}>
+                  <a href={href(x, cat)} aria-current={x === current}>
+                    {shortDate(x)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </Masthead>
 
+      <div className="wrap shell">
         <main className="feed">
           <div className="section-title">
-            <h2>{cat ? CATEGORY_LABEL[cat] : "Notícias do dia"}</h2>
+            <h2>{cat ? CATEGORY_LABEL[cat] : "Os destaques de hoje"}</h2>
             <span>
               {shown.length} {shown.length === 1 ? "notícia" : "notícias"}
             </span>
@@ -146,7 +214,7 @@ export default async function Home({
               <p>
                 <b>Nenhuma edição ainda.</b>
               </p>
-              <p>Clica em &quot;Gerar agora&quot; para criar a primeira, ou espera a entrega das 21h.</p>
+              <p>Toca em &quot;Gerar edição&quot; para criar a primeira, ou espera a entrega das 21h.</p>
             </div>
           )}
 
@@ -156,43 +224,11 @@ export default async function Home({
             </div>
           )}
 
-          {shown.map((s) => (
-            <article className={`card${inRoteiro.has(s.id) ? " inroteiro" : ""}`} key={s.id}>
-              <div className="kicker">
-                <span className={`tag ${s.category}`}>{CATEGORY_LABEL[s.category]}</span>
-                <span>{s.whyRanked}</span>
-                {s.controversy != null && (
-                  <span className={`heat${s.controversy >= 7 ? " hot" : ""}`}>Polêmica {s.controversy}/10</span>
-                )}
-                {inRoteiro.has(s.id) && <span className="flag">No roteiro</span>}
-              </div>
-              <h2 className="headline">{s.titlePt ?? s.title}</h2>
-              {s.summary && <p className="summary">{s.summary}</p>}
-              {s.related && s.related.length > 0 && (
-                <div className="related">
-                  <h4>Também hoje, no mesmo assunto</h4>
-                  <ul>
-                    {s.related.slice(0, 5).map((r) => (
-                      <li key={r.url}>
-                        <a href={r.url} target="_blank" rel="noopener noreferrer">
-                          {r.titlePt ?? r.title}
-                        </a>
-                        <span>{r.source}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {s.titlePt && s.titlePt !== s.title && <p className="orig">Original: {s.title}</p>}
-              <div className="src">
-                {s.sources.map((x) => (
-                  <a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer">
-                    {x.name}
-                  </a>
-                ))}
-              </div>
-            </article>
-          ))}
+          <div className="bento">
+            {shown.map((s, i) => (
+              <StoryCard key={s.id} s={s} size={sizeOf(i)} inRoteiro={inRoteiro.has(s.id)} />
+            ))}
+          </div>
 
           {digest && (
             <p className="diag">

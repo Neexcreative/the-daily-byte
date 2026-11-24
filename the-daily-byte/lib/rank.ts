@@ -87,7 +87,7 @@ function toStory(group: Item[], now: number): Story {
     const key = i.source.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    sources.push({ name: i.source, url: i.link, title: i.title });
+    sources.push({ name: i.source, url: i.link, title: i.title, image: i.image });
     if (sources.length === 4) break;
   }
   const newest = Math.max(...group.map((i) => i.publishedAt));
@@ -100,6 +100,7 @@ function toStory(group: Item[], now: number): Story {
     score: Math.round(score(group, now) * 10) / 10,
     whyRanked: `${n} ${n === 1 ? "fonte" : "fontes"} · há ${hours}h`,
     sources,
+    image: lead.image ?? group.find((i) => i.image)?.image,
   };
 }
 
@@ -112,18 +113,35 @@ const ENTITY_STOP = new Set(
 );
 
 function buildEntityFinder(items: Item[]) {
-  // Se a palavra aparece em minúsculas em algum lugar, não é nome próprio.
-  const lower = new Set<string>();
-  const scan = (text: string) => {
-    for (const raw of text.split(/[^\p{L}\p{N}'’]+/u)) {
-      const w = raw.replace(/['’]s$/i, "");
-      if (/^\p{Ll}/u.test(w)) lower.add(w.toLowerCase());
+  // Manchetes em "Title Case" põem maiúscula em tudo, então a maiúscula só conta no texto
+  // corrido (snippets), fora do início de frase. Nome próprio é o que aparece quase sempre
+  // com maiúscula: um "nvidia.com" perdido não derruba "Nvidia", e "Rule" não vira nome.
+  const lower = new Map<string, number>();
+  const upper = new Map<string, number>();
+  const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+  const scan = (text: string, countUpper: boolean) => {
+    let sentenceStart = true;
+    for (const raw of text.split(/(?<=[.!?:])\s+|[^\p{L}\p{N}'’.!?:]+/u)) {
+      const w = raw.replace(/[.!?:]+$/, "").replace(/['’]s$/i, "");
+      const ends = /[.!?:]$/.test(raw);
+      if (w) {
+        const k = w.toLowerCase();
+        if (/^\p{Ll}/u.test(w)) bump(lower, k);
+        else if (countUpper && !sentenceStart && /^\p{Lu}/u.test(w)) bump(upper, k);
+        sentenceStart = false;
+      }
+      if (ends) sentenceStart = true;
     }
   };
   for (const i of items) {
-    scan(i.title);
-    scan(i.snippet);
+    scan(i.title, false);
+    scan(i.snippet, true);
   }
+  const isCommon = (k: string) => {
+    const lo = lower.get(k) ?? 0;
+    const up = upper.get(k) ?? 0;
+    return lo > 0 && lo * 3 > up;
+  };
   return (title: string): Set<string> => {
     const out = new Set<string>();
     for (const raw of title.split(/[^\p{L}\p{N}'’]+/u)) {
@@ -132,7 +150,7 @@ function buildEntityFinder(items: Item[]) {
       if (w.length === 3 && !/^[A-Z]{3}$/.test(w)) continue;
       if (!/^\p{Lu}/u.test(w)) continue;
       const k = w.toLowerCase();
-      if (lower.has(k) || ENTITY_STOP.has(k)) continue;
+      if (isCommon(k) || ENTITY_STOP.has(k)) continue;
       out.add(k);
     }
     return out;
@@ -169,6 +187,7 @@ function mergeByEntity(ordered: Story[], items: Item[]): Story[] {
       if (owner.sources.length >= 8) break;
       if (!owner.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) owner.sources.push(x);
     }
+    owner.image = owner.image ?? s.image;
     owner.score = Math.round((Math.max(owner.score, s.score) + 0.5) * 10) / 10;
     const n = owner.sources.length;
     owner.whyRanked = owner.whyRanked.replace(/^\d+ \S+/, `${n} ${n === 1 ? "fonte" : "fontes"}`);

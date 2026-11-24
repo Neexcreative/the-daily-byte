@@ -12,7 +12,7 @@ export default function LoginPage() {
         <p className="sub">Área privada.</p>
         <input name="password" type="password" placeholder="Senha" autoFocus required autoComplete="current-password" />
         {error && <p className="err">{error}</p>}
-        <button className="btn" disabled={pending}>{pending ? "Entrando..." : "Entrar"}</button>
+        <button className="btn primary" disabled={pending}>{pending ? "Entrando..." : "Entrar"}</button>
       </form>
     </main>
   );

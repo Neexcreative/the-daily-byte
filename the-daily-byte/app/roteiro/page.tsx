@@ -37,7 +37,7 @@ export default async function RoteiroPage({ searchParams }: { searchParams: Prom
 
         {!r || !digest ? (
           <div className="empty" style={{ marginTop: 20 }}>
-            <p>Ainda não há roteiro para esta edição. Volta ao painel e clica em &quot;Gerar agora&quot;.</p>
+            <p>Ainda não há roteiro para esta edição. Volta ao painel e toca em &quot;Gerar edição&quot;.</p>
           </div>
         ) : (
           <>

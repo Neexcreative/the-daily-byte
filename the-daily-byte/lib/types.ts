@@ -15,9 +15,11 @@ export type Item = {
   publishedAt: number;
   snippet: string;
   weight: number;
+  /** Imagem vinda do próprio feed (enclosure, media:content ou <img> no conteúdo). */
+  image?: string;
 };
 
-export type SourceRef = { name: string; url: string; title: string };
+export type SourceRef = { name: string; url: string; title: string; image?: string };
 
 export type Story = {
   id: string;
@@ -27,6 +29,8 @@ export type Story = {
   score: number;
   whyRanked: string;
   sources: SourceRef[];
+  /** Foto principal da notícia (do feed ou og:image da matéria). */
+  image?: string;
   /** Preenchidos pela IA. */
   titlePt?: string;
   summary?: string;

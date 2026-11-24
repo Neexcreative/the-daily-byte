@@ -1,6 +1,7 @@
 import { collect } from "./collect";
 import { rank } from "./rank";
 import { enrich, writeRoteiro } from "./script";
+import { fillImages } from "./images";
 import { getDigest, listDates, saveDigest } from "./store";
 import { sendEmail } from "./email";
 import type { Digest } from "./types";
@@ -40,6 +41,7 @@ export async function runDigest(opts: { sendMail?: boolean } = {}): Promise<Dige
   const ranked = rank(items, now, exclude, 12);
   const enriched = await enrich(ranked, items);
   const stories = enriched.stories.slice(0, 10);
+  await fillImages(stories);
 
   const written = stories.length ? await writeRoteiro(stories) : { error: "nenhuma notícia coletada" };
   const aiErrors = [enriched.error, written.error].filter(Boolean) as string[];
