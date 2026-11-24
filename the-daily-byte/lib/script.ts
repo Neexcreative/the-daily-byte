@@ -1,6 +1,5 @@
 import type { Item, Roteiro, Story } from "./types";
 import { CATEGORY_LABEL } from "./types";
-import { tokens } from "./rank";
 
 const MAX_WORDS = 150; // 60 segundos a ~150 palavras por minuto
 const WPS = 2.5; // palavras por segundo, fala natural
@@ -32,35 +31,58 @@ const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 async function gemini(system: string, user: string): Promise<unknown> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("sem GEMINI_API_KEY na Vercel");
-  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  // Se um modelo estiver sobrecarregado (503) ou sem cota (429), tenta o próximo.
+  const models = [
+    ...new Set([
+      process.env.GEMINI_MODEL || "gemini-flash-latest",
+      "gemini-flash-latest",
+      "gemini-flash-lite-latest",
+      "gemini-2.5-flash-lite",
+    ]),
+  ];
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
     generationConfig: { responseMimeType: "application/json", temperature: 0.6, maxOutputTokens: 8192 },
   });
 
-  let lastStatus = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body },
-    );
-    lastStatus = res.status;
-    if (res.status === 429 || res.status >= 500) {
-      await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
-      continue;
+  const log: string[] = [];
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body },
+        );
+      } catch {
+        log.push(`${model}: rede`);
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      if (res.status === 429 || res.status >= 500) {
+        log.push(`${model}: ${res.status}`);
+        await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+        continue;
+      }
+      if (res.status === 404) {
+        log.push(`${model}: não existe`);
+        break;
+      }
+      if (!res.ok) throw new Error(`Gemini ${res.status} (${model})`);
+      const data = (await res.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[];
+      };
+      const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      try {
+        return parseJson(text);
+      } catch {
+        log.push(`${model}: resposta inválida`);
+        break;
+      }
     }
-    if (!res.ok) {
-      const hint = res.status === 404 ? ` (modelo "${model}" não existe: ajusta GEMINI_MODEL)` : "";
-      throw new Error(`Gemini ${res.status}${hint}`);
-    }
-    const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-    return parseJson(text);
   }
-  throw new Error(`Gemini indisponível (${lastStatus}), possível limite do plano gratuito`);
+  throw new Error(`Gemini indisponível após tentar vários modelos (${log.join(", ")})`);
 }
 
 type Meta = {
@@ -68,7 +90,6 @@ type Meta = {
   titlePt?: string;
   summary?: string;
   controversy?: number;
-  keyword?: string;
   duplicateOf?: string | null;
   relatedPt?: string[];
 };
@@ -102,9 +123,8 @@ export async function enrich(
 - "titlePt": manchete em português do Brasil, estilo jornal, até 100 caracteres.
 - "summary": resumo em 2 frases em português do Brasil, só com fatos das fontes.
 - "controversy": inteiro de 1 a 10 indicando o quanto o assunto é polêmico, disputado ou gera debate (conflitos, proibições, processos, demissões, escândalos, segurança, ética, tensão EUA e China). Lançamentos neutros ficam entre 1 e 4.
-- "keyword": 1 ou 2 palavras em caixa alta que resumem o assunto para estampar uma imagem: a empresa, o país, o produto ou o número principal (ex.: "NVIDIA", "CHIPS", "$30 BI", "CHINA"). Máximo 14 caracteres.
 - "relatedPt": se a notícia tem "outros fatos do mesmo assunto", traduza cada título para português, na mesma ordem, em um array de textos. Sem eles, devolva [].
-- "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Considere duplicadas notícias do mesmo fato mesmo com títulos em idiomas diferentes (inglês e português) ou ângulos diferentes do mesmo anúncio. Aponte sempre para a notícia mais completa. Notícias sobre a mesma pessoa ou empresa mas fatos diferentes NÃO são duplicadas.
+- "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Notícias sobre a mesma pessoa mas fatos diferentes NÃO são duplicadas.
 
 Responda APENAS com um array JSON, sem markdown.`;
 
@@ -126,62 +146,24 @@ Responda APENAS com um array JSON, sem markdown.`;
           titlePt: typeof m?.relatedPt?.[i] === "string" ? m.relatedPt[i] : undefined,
         })),
         titlePt: m?.titlePt ? String(m.titlePt) : undefined,
-        keyword: m?.keyword ? String(m.keyword).toUpperCase().slice(0, 16) : undefined,
         summary: m?.summary ? String(m.summary) : undefined,
         controversy: Number.isFinite(c) ? Math.min(10, Math.max(1, Math.round(c))) : undefined,
       });
     }
 
-    // Resolve cadeias (A→B→C) para que tudo vá parar na mesma notícia.
-    const rootOf = (id: string): string => {
-      const seen = new Set<string>();
-      let cur = id;
-      while (!seen.has(cur)) {
-        seen.add(cur);
-        const next = meta.get(cur)?.duplicateOf;
-        if (!next || next === cur || !copy.has(next) || seen.has(next)) break;
-        cur = next;
-      }
-      return cur;
-    };
-
     const removed = new Set<string>();
-    const absorb = (target: Story, s: Story) => {
-      const from = copy.get(s.id)!;
-      for (const x of from.sources) {
-        if (target.sources.length >= 8) break;
-        if (!target.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) target.sources.push(x);
-      }
-      for (const r of from.related ?? []) {
-        target.related = target.related ?? [];
-        if (target.related.length < 6 && !target.related.some((y) => y.url === r.url)) target.related.push(r);
-      }
-      target.image = target.image ?? from.image;
-      target.summary = target.summary ?? from.summary;
-      target.controversy = Math.max(target.controversy ?? 0, from.controversy ?? 0) || undefined;
-      target.score = Math.max(target.score, from.score) + 1;
-      removed.add(s.id);
-    };
-
     for (const s of stories) {
-      const root = rootOf(s.id);
-      if (root !== s.id) absorb(copy.get(root)!, s);
-    }
-
-    // Segunda rede: manchetes em português quase iguais também são o mesmo fato.
-    const alive = stories.filter((s) => !removed.has(s.id)).sort((a, b) => b.score - a.score);
-    const tok = new Map(alive.map((s) => [s.id, tokens(copy.get(s.id)!.titlePt ?? s.title)]));
-    for (let i = 0; i < alive.length; i++) {
-      if (removed.has(alive[i].id)) continue;
-      for (let j = i + 1; j < alive.length; j++) {
-        if (removed.has(alive[j].id)) continue;
-        const a = tok.get(alive[i].id)!;
-        const b = tok.get(alive[j].id)!;
-        let inter = 0;
-        for (const t of a) if (b.has(t)) inter++;
-        const sim = a.size && b.size ? inter / (a.size + b.size - inter) : 0;
-        if (sim >= 0.45) absorb(copy.get(alive[i].id)!, alive[j]);
+      const dup = meta.get(s.id)?.duplicateOf;
+      if (!dup || dup === s.id || !copy.has(dup) || meta.get(dup)?.duplicateOf) continue;
+      const target = copy.get(dup)!;
+      for (const x of s.sources) {
+        if (target.sources.length >= 6) break;
+        if (!target.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) {
+          target.sources.push(x);
+        }
       }
+      target.score = Math.max(target.score, s.score) + 1;
+      removed.add(s.id);
     }
 
     const out = stories
@@ -210,8 +192,6 @@ type RawRoteiro = {
 /** Escreve UM roteiro de até 60 segundos com 4 ou mais assuntos, priorizando os mais polêmicos. */
 export async function writeRoteiro(
   stories: Story[],
-  /** Roteiro anterior: quando vem, a IA escreve uma versão nova, com outro gancho e outro ângulo. */
-  previous?: Roteiro,
 ): Promise<{ roteiro?: Roteiro; error?: string }> {
   const candidates = [...stories]
     .sort((a, b) => (b.controversy ?? 0) - (a.controversy ?? 0) || b.score - a.score)
@@ -225,9 +205,6 @@ export async function writeRoteiro(
         `id: ${s.id}\npolêmica: ${s.controversy ?? "?"}/10\ntítulo: ${s.titlePt ?? s.title}\nresumo: ${s.summary ?? ""}\nfontes: ${s.sources.map((x) => x.name).join(", ")}`,
     )
     .join("\n\n");
-  const again = previous
-    ? `\n\nJá existe um roteiro para hoje. Escreva uma versão NOVA, com outro título, outro gancho e outra ordem ou outro ângulo. Não repita estas frases:\ntítulo: ${previous.titulo}\ngancho: ${previous.gancho}`
-    : "";
 
   const system = `Você escreve o roteiro ÚNICO do vídeo diário de notícias de tecnologia do Marlon, criador de conteúdo e estrategista criativo. O vídeo dura NO MÁXIMO 60 segundos e cobre os assuntos mais polêmicos do dia.
 
@@ -249,7 +226,7 @@ Responda APENAS com JSON, sem markdown:
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const raw = (await gemini(system, list + again + feedback)) as RawRoteiro;
+      const raw = (await gemini(system, list + feedback)) as RawRoteiro;
       const ids = new Set(candidates.map((s) => s.id));
       const seen = new Set<string>();
       const blocos = (raw.blocos ?? [])
@@ -271,7 +248,6 @@ Responda APENAS com JSON, sem markdown:
         narracao,
         words,
         seconds: Math.round(words / WPS),
-        writtenAt: new Date().toISOString(),
       };
       if (!best || (blocos.length >= minTopics && words <= MAX_WORDS)) best = roteiro;
       if (blocos.length >= minTopics && words <= MAX_WORDS) return { roteiro };
