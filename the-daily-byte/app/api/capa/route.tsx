@@ -1,19 +1,16 @@
 import { ImageResponse } from "next/og";
 import { isAuthed } from "@/lib/auth";
 import { getDigest, listDates } from "@/lib/store";
-import { CATEGORY_LABEL, type Category, type Digest, type Story } from "@/lib/types";
+import type { Digest, Story } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const W = 1080;
 const H = 1920;
 
-const SECTION_BG: Record<Category, [string, string]> = {
-  ai: ["#6a54e0", "#1c1259"],
-  tech: ["#1b8f88", "#032c2a"],
-  geo: ["#d0414a", "#4a0b10"],
-  market: ["#b88a1c", "#3a2900"],
-};
+// Cores do design system: um único vermelho, preto e branco.
+const RED = "#D92D14";
+const INK = "#0A0A0A";
 
 type FontDef = { name: string; data: ArrayBuffer; weight: 400 | 700 | 900; style: "normal" | "italic" };
 let fontCache: Promise<FontDef[]> | null = null;
@@ -38,10 +35,9 @@ async function loadFont(family: string, weight: number, italic = false): Promise
 function fonts(): Promise<FontDef[]> {
   fontCache ??= (async () => {
     const want: [string, string, 400 | 700 | 900, boolean][] = [
-      ["Display", "Playfair Display", 900, false],
-      ["Display", "Playfair Display", 900, true],
-      ["Sans", "Inter", 700, false],
-      ["Sans", "Inter", 400, false],
+      ["Display", "Big Shoulders", 900, false],
+      ["Sans", "IBM Plex Sans", 700, false],
+      ["Mono", "IBM Plex Mono", 400, false],
     ];
     const out: FontDef[] = [];
     for (const [name, family, weight, italic] of want) {
@@ -104,18 +100,27 @@ async function coverPhoto(d: Digest): Promise<{ story?: Story; img: string | nul
 
 function titleSize(t: string): number {
   const n = t.length;
-  if (n <= 28) return 128;
-  if (n <= 45) return 112;
-  if (n <= 65) return 96;
-  return 82;
+  if (n <= 24) return 150;
+  if (n <= 40) return 128;
+  if (n <= 60) return 108;
+  return 92;
 }
 
 function shortDate(d: string): string {
-  return new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
+  return new Date(`${d}T12:00:00Z`)
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "short", timeZone: "UTC" })
+    .replace(".", "");
+}
+
+/** Logotipo oficial, servido pelo próprio site (arquivo público, sem login). */
+async function logo(req: Request): Promise<string | null> {
+  try {
+    const res = await fetch(new URL("/brand/logo.png", req.url));
+    if (!res.ok) return null;
+    return `data:image/png;base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: Request) {
@@ -127,88 +132,138 @@ export async function GET(req: Request) {
   const digest = date ? await getDigest(date) : null;
   if (!digest || !date) return new Response("sem edição", { status: 404 });
 
-  const [{ story, img }, fontList] = await Promise.all([coverPhoto(digest), fonts()]);
-  const cat: Category = story?.category ?? "tech";
-  const [bgFrom, bgTo] = SECTION_BG[cat];
+  const [{ story, img }, fontList, logoSrc] = await Promise.all([coverPhoto(digest), fonts(), logo(req)]);
 
-  const title = digest.roteiro?.titulo || story?.titlePt || story?.title || "As notícias de hoje";
+  const title = (digest.roteiro?.titulo || story?.titlePt || story?.title || "As notícias de hoje").toUpperCase();
   const topics = digest.roteiro?.blocos ?? [];
   const display = fontList.some((f) => f.name === "Display") ? "Display" : undefined;
   const sans = fontList.some((f) => f.name === "Sans") ? "Sans" : undefined;
+  const mono = fontList.some((f) => f.name === "Mono") ? "Mono" : undefined;
+  const full = { position: "absolute" as const, top: 0, left: 0, width: W, height: H };
 
+  // Área segura do vídeo vertical (design system): fora de 250 px no topo e 480 px na base.
   const image = new ImageResponse(
     (
-      <div
-        style={{
-          width: W,
-          height: H,
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          background: `linear-gradient(160deg, ${bgFrom}, ${bgTo})`,
-          color: "#fff",
-          fontFamily: sans,
-        }}
-      >
-        {img && (
+      <div style={{ width: W, height: H, display: "flex", position: "relative", background: RED, color: "#fff", fontFamily: sans }}>
+        {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" width={W} height={H} style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover" }} />
+          <img src={img} alt="" width={W} height={H} style={{ ...full, objectFit: "cover" }} />
+        ) : (
+          <div
+            style={{
+              ...full,
+              display: "flex",
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,.14) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,.14) 2px, transparent 2px)",
+              backgroundSize: "120px 120px",
+            }}
+          />
         )}
-        {/* Escurece a foto para o texto ficar legível */}
+        {img && (
+          <div
+            style={{
+              ...full,
+              display: "flex",
+              background:
+                "linear-gradient(180deg, rgba(10,10,10,.55) 0%, rgba(10,10,10,0) 26%, rgba(10,10,10,0) 40%, rgba(10,10,10,.7) 62%, rgba(10,10,10,.9) 100%)",
+            }}
+          />
+        )}
+
+        {/* Topo: logotipo oficial e data */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            width: W,
-            height: H,
+            top: 250,
+            left: 72,
+            right: 72,
             display: "flex",
-            background: img
-              ? "linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.05) 22%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.8) 55%, rgba(0,0,0,.92) 100%)"
-              : "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.45) 100%)",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
           }}
-        />
-
-        {/* Topo: marca e data */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "200px 80px 0", position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "baseline", fontFamily: display, fontWeight: 900, fontSize: 56 }}>
-            The Daily&nbsp;<span style={{ fontStyle: "italic", color: "#ff5a4a" }}>Byte</span>
-          </div>
+        >
+          {logoSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoSrc} alt="" width={210} height={210} style={{ borderRadius: 10 }} />
+          ) : (
+            <div style={{ display: "flex", fontFamily: display, fontSize: 72 }}>THE DAILY BYTE</div>
+          )}
           <div
             style={{
               display: "flex",
-              fontSize: 30,
-              fontWeight: 700,
-              padding: "12px 26px",
-              borderRadius: 999,
-              background: "rgba(255,255,255,.16)",
-              border: "2px solid rgba(255,255,255,.28)",
+              fontFamily: mono,
+              fontSize: 34,
+              padding: "12px 22px",
+              border: "3px solid #fff",
+              borderRadius: 10,
+              background: "rgba(10,10,10,.35)",
+              textTransform: "uppercase",
             }}
           >
             {shortDate(date)}
           </div>
         </div>
 
-        {/* Base: título e assuntos */}
-        <div style={{ display: "flex", flexDirection: "column", marginTop: "auto", padding: "0 150px 400px 80px", position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 34 }}>
-            <div style={{ display: "flex", width: 56, height: 8, borderRadius: 8, background: "#ff5a4a" }} />
-            <div style={{ display: "flex", fontSize: 32, fontWeight: 700, letterSpacing: 4, textTransform: "uppercase", color: "#ffd9d4" }}>
-              {topics.length ? `${topics.length} notícias em 60s` : CATEGORY_LABEL[cat]}
+        {/* Base: painel inclinado com a manchete, dentro da área segura */}
+        <div style={{ position: "absolute", left: 64, right: 64, bottom: 480, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 44 }}>
+            <div style={{ display: "flex", width: 60, height: 6, background: "#fff" }} />
+            <div style={{ display: "flex", fontSize: 32, fontWeight: 700, letterSpacing: 5, textTransform: "uppercase" }}>
+              {topics.length ? `${topics.length} notícias em 60 segundos` : "Tech, IA e geopolítica"}
             </div>
           </div>
-          <div
-            style={{
-              display: "flex",
-              fontFamily: display,
-              fontWeight: 900,
-              fontSize: titleSize(title),
-              lineHeight: 1.02,
-              letterSpacing: -2,
-              textShadow: "0 4px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            {title}
+
+          <div style={{ display: "flex", position: "relative", padding: "86px 56px 56px" }}>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                background: "#fff",
+                borderRadius: 44,
+                transform: "skewY(-2deg)",
+              }}
+            />
+            {/* três filetes */}
+            <div style={{ position: "absolute", left: 56, top: 34, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", width: 28, height: 8, borderRadius: 4, background: RED }} />
+              <div style={{ display: "flex", width: 56, height: 8, borderRadius: 4, background: RED }} />
+              <div style={{ display: "flex", width: 112, height: 8, borderRadius: 4, background: RED }} />
+            </div>
+            {/* tarja */}
+            <div
+              style={{
+                position: "absolute",
+                right: -10,
+                top: -40,
+                display: "flex",
+                fontFamily: display,
+                fontSize: 56,
+                lineHeight: 1,
+                padding: "12px 26px",
+                background: INK,
+                color: "#fff",
+                borderRadius: 12,
+              }}
+            >
+              HOJE
+            </div>
+            <div
+              style={{
+                display: "flex",
+                position: "relative",
+                fontFamily: display,
+                fontWeight: 900,
+                fontSize: titleSize(title),
+                lineHeight: 0.9,
+                color: INK,
+              }}
+            >
+              {title}
+            </div>
           </div>
         </div>
       </div>

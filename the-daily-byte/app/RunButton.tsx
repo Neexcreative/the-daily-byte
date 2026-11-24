@@ -11,7 +11,7 @@ export default function RunButton() {
   return (
     <span className="run">
       <button
-        className="btn primary"
+        className="btn solid"
         disabled={busy}
         onClick={async () => {
           setBusy(true);

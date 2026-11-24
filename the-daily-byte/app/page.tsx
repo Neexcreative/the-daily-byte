@@ -5,6 +5,7 @@ import { getDigest, listDates, storageMode } from "@/lib/store";
 import { CATEGORY_LABEL, type Category, type Roteiro, type Story } from "@/lib/types";
 import CopyButton from "./CopyButton";
 import Masthead from "./Masthead";
+import RoteiroButton from "./RoteiroButton";
 import Thumb from "./Thumb";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,9 @@ function sizeOf(i: number): Size {
   return "std";
 }
 
+// Superfícies alternam como no design system: vermelho, preto e branco.
+const SURFACE: Record<Size, string> = { hero: "s-red", tall: "s-ink", wide: "s-white", std: "s-white" };
+
 function StoryCard({ s, size, inRoteiro }: { s: Story; size: Size; inRoteiro: boolean }) {
   const title = s.titlePt ?? s.title;
   const lead = s.sources[0]?.url;
@@ -44,7 +48,7 @@ function StoryCard({ s, size, inRoteiro }: { s: Story; size: Size; inRoteiro: bo
   const showRelated = size === "std" ? 0 : size === "hero" ? 4 : 3;
 
   return (
-    <article className={`tile ${size} ${s.category}`}>
+    <article className={`tile ${size} ${s.category} ${SURFACE[size]}`}>
       <a className="tile-media" href={lead} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
         <Thumb src={s.image} category={s.category} alt="" />
         {inRoteiro && <span className="badge">No roteiro</span>}
@@ -59,11 +63,28 @@ function StoryCard({ s, size, inRoteiro }: { s: Story; size: Size; inRoteiro: bo
           )}
         </div>
 
-        <h2 className="headline">
-          <a href={lead} target="_blank" rel="noopener noreferrer" title={s.titlePt ? `Original: ${s.title}` : undefined}>
-            {title}
-          </a>
-        </h2>
+        {size === "hero" ? (
+          // Manchete principal no painel inclinado da marca, com os três filetes e a tarja.
+          <div className="pn hero-panel">
+            <span className="fil" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="tarja">Hoje</span>
+            <h2 className="headline">
+              <a href={lead} target="_blank" rel="noopener noreferrer" title={s.titlePt ? `Original: ${s.title}` : undefined}>
+                {title}
+              </a>
+            </h2>
+          </div>
+        ) : (
+          <h2 className="headline">
+            <a href={lead} target="_blank" rel="noopener noreferrer" title={s.titlePt ? `Original: ${s.title}` : undefined}>
+              {title}
+            </a>
+          </h2>
+        )}
 
         {s.summary && <p className="summary">{s.summary}</p>}
 
@@ -107,18 +128,31 @@ function RoteiroPanel({
   roteiro,
   date,
   version,
+  hasStories,
 }: {
   roteiro: Roteiro | undefined;
   date: string | undefined;
   version: string | undefined;
+  hasStories: boolean;
 }) {
-  const capa = date ? `/api/capa?d=${date}&v=${encodeURIComponent(version ?? "")}` : undefined;
+  const v = roteiro?.writtenAt ?? version ?? "";
+  const capa = date ? `/api/capa?d=${date}&v=${encodeURIComponent(v)}` : undefined;
+  const written = roteiro?.writtenAt
+    ? new Date(roteiro.writtenAt).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: process.env.DIGEST_TZ || "Europe/Dublin",
+      })
+    : undefined;
   return (
     <aside className="rcol" aria-label="Roteiro do dia">
-      <div className="rbox">
+      <div className="rbox s-ink">
         <div className="rhead">
-          <span>Roteiro do dia</span>
-          {roteiro && <span className="pill">~{roteiro.seconds}s</span>}
+          <span className="eyebrow">
+            <i />
+            Roteiro do dia
+          </span>
+          {roteiro && <span className="pill mono">~{roteiro.seconds}s</span>}
         </div>
 
         {roteiro ? (
@@ -127,6 +161,7 @@ function RoteiroPanel({
             <p className="rmeta">
               {roteiro.blocos.length} assuntos · {roteiro.words} palavras
               {roteiro.seconds > 60 && " · passou de 60s"}
+              {written && ` · escrito às ${written}`}
             </p>
             <p className="rhook">“{roteiro.gancho}”</p>
             {/* No celular o texto completo fica recolhido para as notícias aparecerem logo. */}
@@ -155,7 +190,7 @@ function RoteiroPanel({
                 <div>
                   <b>Capa do vídeo</b>
                   <p>Vertical 1080×1920, pronta para Reels, Shorts e TikTok.</p>
-                  <a className="btn soft" href={`${capa}&download=1`} download={`capa-${date}.png`}>
+                  <a className="btn" href={`${capa}&download=1`} download={`capa-${date}.png`}>
                     Baixar capa
                   </a>
                 </div>
@@ -164,15 +199,24 @@ function RoteiroPanel({
             <div className="ractions">
               <CopyButton text={roteiro.narracao} label="Copiar roteiro" />
               {date && (
-                <a className="btn soft" href={`/roteiro?d=${date}`}>
+                <a className="btn" href={`/roteiro?d=${date}`}>
                   Modo gravação →
                 </a>
               )}
             </div>
+            <div className="ragain">
+              <p>Não gostou? Pede outra versão com as mesmas notícias, a qualquer hora.</p>
+              <RoteiroButton date={date} />
+            </div>
           </>
+        ) : hasStories ? (
+          <div className="rempty">
+            <p>O roteiro desta edição ainda não foi escrito. As notícias já estão aqui: escreve agora, leva uns segundos.</p>
+            <RoteiroButton date={date} label="Escrever roteiro" />
+          </div>
         ) : (
           <p className="rempty">
-            O roteiro desta edição ainda não foi escrito. Toca em &quot;Gerar edição&quot; ou espera a entrega das 21h.
+            Ainda não há notícias nesta edição. Toca em &quot;Gerar edição&quot; ou espera a entrega das 21h.
           </p>
         )}
       </div>
@@ -200,7 +244,7 @@ export default async function Home({
 
   return (
     <>
-      <Masthead left={current ? longDate(current) : "Sem edição"} right={`edição das 21h · ${all.length} notícias`}>
+      <Masthead left={current ? longDate(current) : "Sem edição"} right={`Tecnologia, IA e geopolítica da tecnologia · ${all.length} notícias nesta edição`}>
         <ul className="sections">
           <li>
             <a href={href(current, undefined)} aria-current={!cat}>
@@ -235,10 +279,13 @@ export default async function Home({
       <div className="wrap shell">
         <main className="feed">
           <div className="section-title">
-            <h2>{cat ? CATEGORY_LABEL[cat] : "Os destaques de hoje"}</h2>
-            <span>
-              {shown.length} {shown.length === 1 ? "notícia" : "notícias"}
-            </span>
+            <div>
+              <p className="eyebrow">
+                <i />
+                {shown.length} {shown.length === 1 ? "notícia" : "notícias"} · com fonte
+              </p>
+              <h2>{cat ? CATEGORY_LABEL[cat] : "Os destaques de hoje"}</h2>
+            </div>
           </div>
 
           {!digest && (
@@ -278,7 +325,12 @@ export default async function Home({
           )}
         </main>
 
-        <RoteiroPanel roteiro={digest?.roteiro} date={current} version={digest?.generatedAt} />
+        <RoteiroPanel
+          roteiro={digest?.roteiro}
+          date={current}
+          version={digest?.generatedAt}
+          hasStories={all.length > 0}
+        />
       </div>
     </>
   );

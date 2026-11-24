@@ -72,3 +72,21 @@ export async function runDigest(opts: { sendMail?: boolean } = {}): Promise<Dige
   await saveDigest(digest);
   return digest;
 }
+
+/**
+ * Escreve um roteiro novo para uma edição já coletada, sem buscar as notícias de novo.
+ * Leva poucos segundos e pode ser chamado a qualquer hora.
+ */
+export async function rewriteRoteiro(date?: string): Promise<Digest> {
+  const dates = await listDates(14);
+  const target = date && dates.includes(date) ? date : dates[0];
+  const digest = target ? await getDigest(target) : null;
+  if (!digest) throw new Error("nenhuma edição para escrever o roteiro");
+  if (!digest.stories.length) throw new Error("a edição não tem notícias");
+
+  const written = await writeRoteiro(digest.stories, digest.roteiro);
+  if (!written.roteiro) throw new Error(written.error ?? "a IA não devolveu roteiro");
+  digest.roteiro = written.roteiro;
+  await saveDigest(digest);
+  return digest;
+}

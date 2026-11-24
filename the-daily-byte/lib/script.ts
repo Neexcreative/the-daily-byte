@@ -207,6 +207,8 @@ type RawRoteiro = {
 /** Escreve UM roteiro de até 60 segundos com 4 ou mais assuntos, priorizando os mais polêmicos. */
 export async function writeRoteiro(
   stories: Story[],
+  /** Roteiro anterior: quando vem, a IA escreve uma versão nova, com outro gancho e outro ângulo. */
+  previous?: Roteiro,
 ): Promise<{ roteiro?: Roteiro; error?: string }> {
   const candidates = [...stories]
     .sort((a, b) => (b.controversy ?? 0) - (a.controversy ?? 0) || b.score - a.score)
@@ -220,6 +222,9 @@ export async function writeRoteiro(
         `id: ${s.id}\npolêmica: ${s.controversy ?? "?"}/10\ntítulo: ${s.titlePt ?? s.title}\nresumo: ${s.summary ?? ""}\nfontes: ${s.sources.map((x) => x.name).join(", ")}`,
     )
     .join("\n\n");
+  const again = previous
+    ? `\n\nJá existe um roteiro para hoje. Escreva uma versão NOVA, com outro título, outro gancho e outra ordem ou outro ângulo. Não repita estas frases:\ntítulo: ${previous.titulo}\ngancho: ${previous.gancho}`
+    : "";
 
   const system = `Você escreve o roteiro ÚNICO do vídeo diário de notícias de tecnologia do Marlon, criador de conteúdo e estrategista criativo. O vídeo dura NO MÁXIMO 60 segundos e cobre os assuntos mais polêmicos do dia.
 
@@ -241,7 +246,7 @@ Responda APENAS com JSON, sem markdown:
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const raw = (await gemini(system, list + feedback)) as RawRoteiro;
+      const raw = (await gemini(system, list + again + feedback)) as RawRoteiro;
       const ids = new Set(candidates.map((s) => s.id));
       const seen = new Set<string>();
       const blocos = (raw.blocos ?? [])
@@ -263,6 +268,7 @@ Responda APENAS com JSON, sem markdown:
         narracao,
         words,
         seconds: Math.round(words / WPS),
+        writtenAt: new Date().toISOString(),
       };
       if (!best || (blocos.length >= minTopics && words <= MAX_WORDS)) best = roteiro;
       if (blocos.length >= minTopics && words <= MAX_WORDS) return { roteiro };

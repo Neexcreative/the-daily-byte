@@ -7,7 +7,7 @@ export default function CopyButton({ text, label = "Copiar roteiro" }: { text: s
   return (
     <button
       type="button"
-      className="btn soft"
+      className="btn"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);

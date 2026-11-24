@@ -4,13 +4,13 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "The Daily Byte",
     short_name: "Daily Byte",
-    description: "Notícias de tech, IA e geopolítica, com fontes e roteiro pronto.",
+    description: "Tech, IA e geopolítica da tecnologia. Informação com fonte.",
     start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#faf8f4",
-    theme_color: "#faf8f4",
+    background_color: "#D92D14",
+    theme_color: "#D92D14",
     lang: "pt-BR",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

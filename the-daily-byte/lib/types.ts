@@ -53,6 +53,8 @@ export type Roteiro = {
   narracao: string;
   words: number;
   seconds: number;
+  /** Quando este roteiro foi escrito (pode ser depois da coleta, ao pedir um roteiro novo). */
+  writtenAt?: string;
 };
 
 export type Digest = {

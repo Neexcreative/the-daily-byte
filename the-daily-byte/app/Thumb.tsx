@@ -3,15 +3,19 @@
 import { useState } from "react";
 import type { Category } from "@/lib/types";
 
-const GLYPH: Record<Category, string> = { ai: "IA", tech: "T", geo: "G", market: "$" };
+const LABEL: Record<Category, string> = { ai: "IA", tech: "Tech", geo: "Geo", market: "Mercado" };
 
-/** Foto da notícia; se não houver ou falhar ao carregar, mostra um quadro tipográfico na cor da seção. */
+/** Foto da notícia; se não houver ou falhar ao carregar, mostra o quadro vermelho da marca. */
 export default function Thumb({ src, category, alt }: { src?: string; category: Category; alt: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className={`thumb ph ${category}`} aria-hidden="true">
-        <span>{GLYPH[category]}</span>
+      // Sem foto: quadro vermelho com o painel inclinado da marca.
+      <div className="thumb ph grid-bg" aria-hidden="true">
+        <span className="ph-panel">
+          <span className="fil"><i /><i /><i /></span>
+          <b>{LABEL[category]}</b>
+        </span>
       </div>
     );
   }

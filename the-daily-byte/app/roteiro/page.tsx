@@ -4,6 +4,7 @@ import { longDate } from "@/lib/format";
 import { getDigest, listDates } from "@/lib/store";
 import CopyButton from "../CopyButton";
 import Masthead from "../Masthead";
+import RoteiroButton from "../RoteiroButton";
 
 export const dynamic = "force-dynamic";
 
@@ -51,12 +52,13 @@ export default async function RoteiroPage({ searchParams }: { searchParams: Prom
               <CopyButton text={r.narracao} label="Copiar roteiro" />
               <CopyButton text={withSources} label="Copiar com fontes" />
               <a
-                className="btn soft"
-                href={`/api/capa?d=${date}&v=${encodeURIComponent(digest.generatedAt)}&download=1`}
+                className="btn"
+                href={`/api/capa?d=${date}&v=${encodeURIComponent(r.writtenAt ?? digest.generatedAt)}&download=1`}
                 download={`capa-${date}.png`}
               >
                 Baixar capa
               </a>
+              <RoteiroButton date={date} />
             </div>
 
             <div className="block">
