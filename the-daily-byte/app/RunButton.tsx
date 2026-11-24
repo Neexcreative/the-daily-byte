@@ -30,7 +30,7 @@ export default function RunButton() {
       >
         {busy ? "Gerando..." : "Gerar agora"}
       </button>
-      {msg && <small style={{ color: "var(--muted)" }}>{msg}</small>}
+      {msg && <small style={{ color: "var(--mast-muted)" }}>{msg}</small>}
     </span>
   );
 }

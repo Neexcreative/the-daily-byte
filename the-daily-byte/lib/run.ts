@@ -36,7 +36,7 @@ export async function runDigest(opts: { sendMail?: boolean } = {}): Promise<Dige
 
   const { items, feedsOk, feedsFailed } = await collect(now);
   const ranked = rank(items, now, exclude, 8);
-  const { stories, errors } = await writeScripts(ranked, items, 5);
+  const { stories, errors } = await writeScripts(ranked, items, 8);
 
   const digest: Digest = {
     date,

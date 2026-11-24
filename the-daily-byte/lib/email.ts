@@ -21,7 +21,7 @@ export function renderEmail(d: Digest): { subject: string; html: string } {
         .join(" · ");
       return `<div style="padding:14px 0;border-top:1px solid #e5e5e5">
         <div style="font-size:12px;color:#777;text-transform:uppercase;letter-spacing:.04em">${CATEGORY_LABEL[s.category]} · ${esc(s.whyRanked)}</div>
-        <div style="font-size:17px;font-weight:600;margin-top:4px">${esc(s.title)}</div>
+        <div style="font-size:17px;font-weight:600;margin-top:4px">${base ? `<a href="${esc(base)}/story/${s.id}?d=${d.date}" style="color:#111;text-decoration:none">${esc(s.script?.titlePt ?? s.title)}</a>` : esc(s.script?.titlePt ?? s.title)}</div>
         ${hook}
         <div style="font-size:13px;margin-top:6px">${src}</div>
       </div>`;

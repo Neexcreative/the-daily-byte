@@ -13,8 +13,12 @@ Regras:
 - Sem buzzwords e sem promessas irreais. Nunca use: revolucionário, game-changing, segredo, crescimento da noite pro dia, hack de crescimento, 10x, viralizar a qualquer custo.
 - Estrutura: gancho (primeiros 3 segundos) → contexto → três pontos → por que importa → chamada curta para ação.
 
+Todo o texto da resposta deve estar em português do Brasil, inclusive o título.
+
 Responda APENAS com JSON válido, sem markdown, neste formato:
 {
+  "titlePt": "título da notícia em português, estilo manchete de jornal, até 100 caracteres",
+  "summary": "resumo em 2 frases, só com fatos das fontes",
   "hook": "frase de impacto, até 15 palavras",
   "narration": "texto corrido completo para gravar, entre 80 e 140 palavras (30 a 60 segundos)",
   "points": ["ponto 1", "ponto 2", "ponto 3"],
@@ -75,6 +79,8 @@ export async function writeScript(story: Story, snippets: Map<string, string>): 
   }
   const wpm = 150;
   return {
+    titlePt: String(raw.titlePt || story.title),
+    summary: String(raw.summary ?? ""),
     hook: String(raw.hook),
     narration: String(raw.narration),
     points: raw.points.slice(0, 3).map(String),

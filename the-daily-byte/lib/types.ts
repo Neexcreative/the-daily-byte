@@ -20,6 +20,8 @@ export type Item = {
 export type SourceRef = { name: string; url: string; title: string };
 
 export type Script = {
+  titlePt: string;
+  summary: string;
   hook: string;
   narration: string;
   points: string[];
