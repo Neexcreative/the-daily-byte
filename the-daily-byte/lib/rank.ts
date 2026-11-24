@@ -103,6 +103,79 @@ function toStory(group: Item[], now: number): Story {
   };
 }
 
+
+// Palavras que parecem nomes próprios mas são genéricas demais para agrupar notícias.
+const ENTITY_STOP = new Set(
+  "china chinese india indian europe european america american united states senate congress house white trump biden government report reports says said after over with from will what here week year today first second announces launches releases about against amid could would should their there these those other more most than into back next last just only also still ever never every again ahead behind during while where which whose whom than then when why how who the and for new now one two big top best news update updates monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december".split(
+    " ",
+  ),
+);
+
+function buildEntityFinder(items: Item[]) {
+  // Se a palavra aparece em minúsculas em algum lugar, não é nome próprio.
+  const lower = new Set<string>();
+  const scan = (text: string) => {
+    for (const raw of text.split(/[^\p{L}\p{N}'’]+/u)) {
+      const w = raw.replace(/['’]s$/i, "");
+      if (/^\p{Ll}/u.test(w)) lower.add(w.toLowerCase());
+    }
+  };
+  for (const i of items) {
+    scan(i.title);
+    scan(i.snippet);
+  }
+  return (title: string): Set<string> => {
+    const out = new Set<string>();
+    for (const raw of title.split(/[^\p{L}\p{N}'’]+/u)) {
+      const w = raw.replace(/['’]s$/i, "");
+      if (w.length < 3) continue;
+      if (w.length === 3 && !/^[A-Z]{3}$/.test(w)) continue;
+      if (!/^\p{Lu}/u.test(w)) continue;
+      const k = w.toLowerCase();
+      if (lower.has(k) || ENTITY_STOP.has(k)) continue;
+      out.add(k);
+    }
+    return out;
+  };
+}
+
+/**
+ * Junta notícias que giram em torno da mesma empresa, pessoa ou saga
+ * (ex.: seis notícias sobre a Nvidia viram um cartão só, com os desdobramentos listados).
+ * Recebe as histórias já ordenadas por relevância.
+ */
+function mergeByEntity(ordered: Story[], items: Item[]): Story[] {
+  const entitiesOf = buildEntityFinder(items);
+  const owners = new Map<string, Story>();
+  const out: Story[] = [];
+  for (const s of ordered) {
+    const ents = entitiesOf(s.title);
+    let owner: Story | undefined;
+    for (const e of ents) {
+      const o = owners.get(e);
+      if (o) {
+        owner = o;
+        break;
+      }
+    }
+    if (!owner) {
+      out.push(s);
+      for (const e of ents) owners.set(e, s);
+      continue;
+    }
+    owner.related = owner.related ?? [];
+    owner.related.push({ title: s.title, url: s.sources[0].url, source: s.sources[0].name });
+    for (const x of s.sources) {
+      if (owner.sources.length >= 8) break;
+      if (!owner.sources.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) owner.sources.push(x);
+    }
+    owner.score = Math.round((Math.max(owner.score, s.score) + 0.5) * 10) / 10;
+    const n = owner.sources.length;
+    owner.whyRanked = owner.whyRanked.replace(/^\d+ \S+/, `${n} ${n === 1 ? "fonte" : "fontes"}`);
+  }
+  return out;
+}
+
 /**
  * Escolhe as melhores histórias do dia. Garante espaço para geopolítica e IA
  * quando existirem, para o painel não virar só uma categoria.
@@ -118,7 +191,10 @@ export function rank(
     .map((g) => ({ g, s: score(g, now) }))
     .sort((a, b) => b.s - a.s);
 
-  const stories = groups.map(({ g }) => toStory(g, now));
+  const stories = mergeByEntity(
+    groups.map(({ g }) => toStory(g, now)),
+    items,
+  );
   const selected = stories.slice(0, limit);
   const rest = stories.slice(limit);
 

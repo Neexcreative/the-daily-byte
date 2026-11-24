@@ -70,6 +70,13 @@ a { color: inherit; }
 .headline { font-family: var(--serif); font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; margin: 8px 0 8px; font-size: 21px; }
 .summary { margin: 0 0 8px; font-size: 15px; }
 .orig { margin: 0 0 10px; font-size: 12px; color: var(--muted); font-style: italic; }
+.related { margin: 4px 0 12px; padding: 10px 12px; background: var(--paper); border: 1px solid var(--rule); }
+.related h4 { margin: 0 0 6px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.related ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.related li { font-size: 14px; line-height: 1.35; }
+.related li a { text-decoration: none; font-weight: 600; }
+.related li a:hover { text-decoration: underline; }
+.related li span { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .src { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
 .src a { text-decoration: none; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 10px; background: var(--paper); }
 .src a:hover { border-color: var(--ink); }

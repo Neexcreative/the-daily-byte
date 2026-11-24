@@ -32,7 +32,11 @@ export type Story = {
   summary?: string;
   /** 1 a 10: o quanto o assunto é polêmico ou gera debate. */
   controversy?: number;
+  /** Outros fatos do dia sobre o mesmo assunto (mesma empresa, pessoa ou saga). */
+  related?: RelatedRef[];
 };
+
+export type RelatedRef = { title: string; titlePt?: string; url: string; source: string };
 
 export type RoteiroBlock = { storyId: string; assunto: string; texto: string };
 

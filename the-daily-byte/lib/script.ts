@@ -68,6 +68,7 @@ type Meta = {
   summary?: string;
   controversy?: number;
   duplicateOf?: string | null;
+  relatedPt?: string[];
 };
 
 /**
@@ -86,7 +87,11 @@ export async function enrich(
         .slice(0, 3)
         .map((x) => `  - ${x.name}: ${x.title}. ${(snippets.get(x.url) || "").slice(0, 220)}`)
         .join("\n");
-      return `id: ${s.id}\ncategoria: ${CATEGORY_LABEL[s.category]}\ntítulo: ${s.title}\nfontes:\n${src}`;
+      const rel = (s.related ?? [])
+        .slice(0, 5)
+        .map((r, i) => `  [${i}] ${r.title} (${r.source})`)
+        .join("\n");
+      return `id: ${s.id}\ncategoria: ${CATEGORY_LABEL[s.category]}\ntítulo: ${s.title}\nfontes:\n${src}${rel ? `\noutros fatos do mesmo assunto:\n${rel}` : ""}`;
     })
     .join("\n\n");
 
@@ -95,6 +100,7 @@ export async function enrich(
 - "titlePt": manchete em português do Brasil, estilo jornal, até 100 caracteres.
 - "summary": resumo em 2 frases em português do Brasil, só com fatos das fontes.
 - "controversy": inteiro de 1 a 10 indicando o quanto o assunto é polêmico, disputado ou gera debate (conflitos, proibições, processos, demissões, escândalos, segurança, ética, tensão EUA e China). Lançamentos neutros ficam entre 1 e 4.
+- "relatedPt": se a notícia tem "outros fatos do mesmo assunto", traduza cada título para português, na mesma ordem, em um array de textos. Sem eles, devolva [].
 - "duplicateOf": o id de OUTRA notícia da lista que trata do MESMO fato ou evento, ou null. Notícias sobre a mesma pessoa mas fatos diferentes NÃO são duplicadas.
 
 Responda APENAS com um array JSON, sem markdown.`;
@@ -112,6 +118,10 @@ Responda APENAS com um array JSON, sem markdown.`;
       copy.set(s.id, {
         ...s,
         sources: [...s.sources],
+        related: s.related?.slice(0, 5).map((r, i) => ({
+          ...r,
+          titlePt: typeof m?.relatedPt?.[i] === "string" ? m.relatedPt[i] : undefined,
+        })),
         titlePt: m?.titlePt ? String(m.titlePt) : undefined,
         summary: m?.summary ? String(m.summary) : undefined,
         controversy: Number.isFinite(c) ? Math.min(10, Math.max(1, Math.round(c))) : undefined,

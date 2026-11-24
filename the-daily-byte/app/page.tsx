@@ -168,6 +168,21 @@ export default async function Home({
               </div>
               <h2 className="headline">{s.titlePt ?? s.title}</h2>
               {s.summary && <p className="summary">{s.summary}</p>}
+              {s.related && s.related.length > 0 && (
+                <div className="related">
+                  <h4>Também hoje, no mesmo assunto</h4>
+                  <ul>
+                    {s.related.slice(0, 5).map((r) => (
+                      <li key={r.url}>
+                        <a href={r.url} target="_blank" rel="noopener noreferrer">
+                          {r.titlePt ?? r.title}
+                        </a>
+                        <span>{r.source}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {s.titlePt && s.titlePt !== s.title && <p className="orig">Original: {s.title}</p>}
               <div className="src">
                 {s.sources.map((x) => (
