@@ -11,6 +11,9 @@ export function longDate(d: string): string {
 /** Perfil oficial no Instagram. */
 export const INSTAGRAM = "thedailybyte_26";
 
+/** Design system da marca (The Daily Byte Brand Digital, no claude.ai). */
+export const BRAND_URL = "https://claude.ai/artifact/Y8iCXeaGtGRtUTFsNCG55E";
+
 const KW_STOP = new Set(
   "the a an and or of to in on for with from at by as is are was be new how why what who when after over amid says said report reports us u.s. uk eu ai o os as um uma de da do das dos em no na nos nas por para com que se sobre após diz".split(
     " ",

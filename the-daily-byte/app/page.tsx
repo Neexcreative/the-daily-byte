@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
-import { INSTAGRAM, keywordOf, longDate } from "@/lib/format";
+import { BRAND_URL, INSTAGRAM, keywordOf, longDate } from "@/lib/format";
 import { getDigest, listDates, storageMode } from "@/lib/store";
 import { CATEGORY_LABEL, type Category, type Roteiro, type Story } from "@/lib/types";
 import CopyButton from "./CopyButton";
@@ -366,6 +366,9 @@ export default async function Home({
           <p>{TAGLINE}</p>
           <a className="mono" href={`https://instagram.com/${INSTAGRAM}`} target="_blank" rel="noopener noreferrer">
             @{INSTAGRAM}
+          </a>
+          <a className="mono" href={BRAND_URL} target="_blank" rel="noopener noreferrer">
+            Design system
           </a>
         </div>
       </footer>
