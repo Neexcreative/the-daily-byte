@@ -60,7 +60,11 @@ async function photo(url: string | undefined): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 7000);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 (TheDailyByte cover)" } });
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      // Pede JPEG/PNG: muitos CDNs mandam WebP quando o cliente aceita, e o gerador não lê WebP.
+      headers: { "User-Agent": "Mozilla/5.0 (TheDailyByte cover)", Accept: "image/jpeg,image/png;q=0.9,*/*;q=0.1" },
+    });
     const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
     if (!res.ok || !/^image\/(jpeg|jpg|png)$/.test(type)) return null;
     const buf = Buffer.from(await res.arrayBuffer());
@@ -73,13 +77,29 @@ async function photo(url: string | undefined): Promise<string | null> {
   }
 }
 
-/** Notícia da capa: a primeira do roteiro que tenha foto; senão, a primeira do roteiro. */
-function coverStory(d: Digest): Story | undefined {
-  const order = (d.roteiro?.blocos ?? [])
+/**
+ * Foto de fundo: começa pela notícia principal do roteiro (a de maior relevância) e,
+ * se a foto dela não carregar, tenta as próximas, até achar uma que funcione.
+ */
+async function coverPhoto(d: Digest): Promise<{ story?: Story; img: string | null }> {
+  const byScore = (a: Story, b: Story) => b.score - a.score;
+  const inRoteiro = (d.roteiro?.blocos ?? [])
     .map((b) => d.stories.find((s) => s.id === b.storyId))
-    .filter((s): s is Story => !!s);
-  const pool = order.length ? order : d.stories;
-  return pool.find((s) => s.image) ?? pool[0];
+    .filter((s): s is Story => !!s)
+    .sort(byScore);
+  const rest = d.stories.filter((s) => !inRoteiro.includes(s)).sort(byScore);
+  const order = [...inRoteiro, ...rest];
+
+  let tries = 0;
+  for (const s of order) {
+    const urls = [s.image, ...s.sources.map((x) => x.image)].filter((u, i, all): u is string => !!u && all.indexOf(u) === i);
+    for (const u of urls) {
+      if (tries++ >= 8) return { story: order[0], img: null };
+      const img = await photo(u);
+      if (img) return { story: s, img };
+    }
+  }
+  return { story: order[0], img: null };
 }
 
 function titleSize(t: string): number {
@@ -107,13 +127,12 @@ export async function GET(req: Request) {
   const digest = date ? await getDigest(date) : null;
   if (!digest || !date) return new Response("sem edição", { status: 404 });
 
-  const story = coverStory(digest);
+  const [{ story, img }, fontList] = await Promise.all([coverPhoto(digest), fonts()]);
   const cat: Category = story?.category ?? "tech";
   const [bgFrom, bgTo] = SECTION_BG[cat];
-  const [img, fontList] = await Promise.all([photo(story?.image), fonts()]);
 
   const title = digest.roteiro?.titulo || story?.titlePt || story?.title || "As notícias de hoje";
-  const topics = (digest.roteiro?.blocos ?? []).map((b) => b.assunto).filter(Boolean).slice(0, 5);
+  const topics = digest.roteiro?.blocos ?? [];
   const display = fontList.some((f) => f.name === "Display") ? "Display" : undefined;
   const sans = fontList.some((f) => f.name === "Sans") ? "Sans" : undefined;
 
@@ -191,26 +210,6 @@ export async function GET(req: Request) {
           >
             {title}
           </div>
-          {topics.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 52 }}>
-              {topics.map((t) => (
-                <div
-                  key={t}
-                  style={{
-                    display: "flex",
-                    fontSize: 32,
-                    fontWeight: 700,
-                    padding: "14px 28px",
-                    borderRadius: 999,
-                    background: "rgba(255,255,255,.95)",
-                    color: "#121212",
-                  }}
-                >
-                  {t}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     ),
