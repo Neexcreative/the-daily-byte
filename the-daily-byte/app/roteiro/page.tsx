@@ -50,6 +50,13 @@ export default async function RoteiroPage({ searchParams }: { searchParams: Prom
               </span>
               <CopyButton text={r.narracao} label="Copiar roteiro" />
               <CopyButton text={withSources} label="Copiar com fontes" />
+              <a
+                className="btn soft"
+                href={`/api/capa?d=${date}&v=${encodeURIComponent(digest.generatedAt)}&download=1`}
+                download={`capa-${date}.png`}
+              >
+                Baixar capa
+              </a>
             </div>
 
             <div className="block">

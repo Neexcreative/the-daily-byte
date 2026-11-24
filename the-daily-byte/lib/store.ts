@@ -7,7 +7,9 @@ const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TO
 const redis = url && token ? new Redis({ url, token }) : null;
 
 // Só para desenvolvimento local, sem Redis configurado.
-const mem = new Map<string, Digest>();
+// Fica no globalThis para todas as rotas verem o mesmo mapa (cada rota tem seu próprio bundle).
+const g = globalThis as { __tdbMem?: Map<string, Digest> };
+const mem = (g.__tdbMem ??= new Map<string, Digest>());
 
 export const storageMode = redis ? "redis" : "memória (não persiste)";
 

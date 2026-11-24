@@ -103,7 +103,16 @@ function StoryCard({ s, size, inRoteiro }: { s: Story; size: Size; inRoteiro: bo
   );
 }
 
-function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: string | undefined }) {
+function RoteiroPanel({
+  roteiro,
+  date,
+  version,
+}: {
+  roteiro: Roteiro | undefined;
+  date: string | undefined;
+  version: string | undefined;
+}) {
+  const capa = date ? `/api/capa?d=${date}&v=${encodeURIComponent(version ?? "")}` : undefined;
   return (
     <aside className="rcol" aria-label="Roteiro do dia">
       <div className="rbox">
@@ -129,6 +138,21 @@ function RoteiroPanel({ roteiro, date }: { roteiro: Roteiro | undefined; date: s
               ))}
             </ol>
             <p className="rclose">{roteiro.fechamento}</p>
+            {capa && (
+              <div className="rcover">
+                <a href={capa} target="_blank" rel="noopener noreferrer" title="Abrir a capa em tamanho real">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={capa} alt="Capa vertical do vídeo de hoje" loading="lazy" />
+                </a>
+                <div>
+                  <b>Capa do vídeo</b>
+                  <p>Vertical 1080×1920, pronta para Reels, Shorts e TikTok.</p>
+                  <a className="btn soft" href={`${capa}&download=1`} download={`capa-${date}.png`}>
+                    Baixar capa
+                  </a>
+                </div>
+              </div>
+            )}
             <div className="ractions">
               <CopyButton text={roteiro.narracao} label="Copiar roteiro" />
               {date && (
@@ -246,7 +270,7 @@ export default async function Home({
           )}
         </main>
 
-        <RoteiroPanel roteiro={digest?.roteiro} date={current} />
+        <RoteiroPanel roteiro={digest?.roteiro} date={current} version={digest?.generatedAt} />
       </div>
     </>
   );
